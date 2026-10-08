@@ -37,18 +37,8 @@ jobs:
         with:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          name: NetHack5-ChatGPT-Guide-arm64-debug
+          name: NetHack5-Guide-arm64-stable-signed-debug
           path: artifact/debug
-
-      - name: Download signed release APK when configured
-        if: ${{ env.PUBLISH_SKIP != '1' }}
-        uses: actions/download-artifact@v4
-        continue-on-error: true
-        with:
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          name: NetHack5-ChatGPT-Guide-arm64-release
-          path: artifact/release
 
       - name: Verify APK archives
         if: ${{ env.PUBLISH_SKIP != '1' }}
@@ -58,9 +48,6 @@ jobs:
           debug="$(find artifact/debug -name '*.apk' -print -quit)"
           test -n "$debug"
           unzip -t "$debug" > /dev/null
-          if test -f artifact/release/NetHack5-ChatGPT-Guide-arm64-release.apk; then
-            unzip -t artifact/release/NetHack5-ChatGPT-Guide-arm64-release.apk > /dev/null
-          fi
 
       - name: Publish direct APK assets in a preview release
         if: ${{ env.PUBLISH_SKIP != '1' }}
@@ -72,10 +59,8 @@ jobs:
           if ! gh release view guide-preview > /dev/null 2>&1; then
             gh release create guide-preview --target main --prerelease \
               --title 'NetHack 5 ChatGPT Guide (preview)' \
-              --notes 'Experimental in-game AI guide. Install arm64 APK at your own risk; live-device testing is still required. The debug APK is not permanently signed. A stable updateable release APK is published only when a permanent signing key is configured.'
+              --notes 'NetHack 5 experimental Guide. From the first private-key-signed build onward, future versions use the same certificate and support normal updates. OLD app-arm64-v8a-debug.apk releases used disposable CI keys and require a one-time signed-key migration. Always back up saves before migrating.'
           fi
           debug="$(find artifact/debug -name '*.apk' -print -quit)"
-          gh release upload guide-preview "$debug#NetHack5-ChatGPT-Guide-arm64-debug.apk" --clobber
-          if test -f artifact/release/NetHack5-ChatGPT-Guide-arm64-release.apk; then
-            gh release upload guide-preview artifact/release/NetHack5-ChatGPT-Guide-arm64-release.apk --clobber
-          fi
+          gh release upload guide-preview "$debug#NetHack5-Guide-arm64-updateable.apk" --clobber
+          gh release edit guide-preview --notes 'Current NetHack 5 Guide preview (ARM64), signed with your persistent private key. Once an initial migration from old ephemeral debug certificates is complete, subsequent updates preserve game data. OLD app-arm64-v8a-debug.apk used a disposable signature and cannot be upgraded in place. Read the README migration instructions. Physical-device testing still required.'
