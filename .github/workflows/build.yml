@@ -92,43 +92,32 @@ jobs:
           make fetch-lua
           make install
 
-      - name: Build testable debug APK
+      - name: Build stable-signed debug APK
         working-directory: upstream/sys/android
         run: bash ./gradlew :app:assembleDebug --stacktrace --no-daemon
 
-      - name: Upload debug APK for physical testing
+      - name: Verify persistent signing certificate matches the keystore
+        working-directory: upstream/sys/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="$(find app/build/outputs/apk/debug -maxdepth 1 -name '*arm64*v8a*.apk' -print -quit)"
+          test -n "$apk"
+          unzip -t "$apk" >/dev/null
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$apk" > "$RUNNER_TEMP/nethack-cert.txt"
+          keytool -exportcert -keystore "$NETHACK_STABLE_KEYSTORE" \
+            -storepass "$NETHACK_STABLE_STORE_PASSWORD" \
+            -alias "$NETHACK_STABLE_KEY_ALIAS" -file "$RUNNER_TEMP/expected.der"
+          expected="$(openssl x509 -inform DER -in "$RUNNER_TEMP/expected.der" -noout -fingerprint -sha256 | cut -d= -f2 | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          actual="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/nethack-cert.txt" | tr -d '\r')"
+          test -n "$actual" && test "$expected" = "$actual" || { echo "::error::APK signature mismatch"; exit 1; }
+          echo "Verified stable update certificate SHA-256: $actual"
+
+      - name: Upload verified stable-signed APK for physical testing
         uses: actions/upload-artifact@v4
         with:
-          name: NetHack5-ChatGPT-Guide-arm64-debug
+          name: NetHack5-Guide-arm64-stable-signed-debug
           path: upstream/sys/android/app/build/outputs/apk/debug/*arm64*v8a*.apk
           if-no-files-found: error
           retention-days: 30
 
-      - name: Build and sign updateable APK with configured permanent key
-        if: ${{ env.KEYSTORE_BASE64 != '' && env.KEYSTORE_PASSWORD != '' && env.KEY_ALIAS != '' && env.KEY_PASSWORD != '' }}
-        working-directory: upstream/sys/android
-        shell: bash
-        run: |
-          bash ./gradlew :app:assembleRelease --stacktrace --no-daemon
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/nethack-guide.jks"
-          unsigned_apk="$(find app/build/outputs/apk/release -maxdepth 1 -name '*arm64*v8a*unsigned*.apk' -print -quit)"
-          test -n "$unsigned_apk"
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" sign \
-            --ks "$RUNNER_TEMP/nethack-guide.jks" \
-            --ks-pass env:KEYSTORE_PASSWORD \
-            --ks-key-alias "$KEY_ALIAS" \
-            --key-pass env:KEY_PASSWORD \
-            --out "$RUNNER_TEMP/NetHack5-ChatGPT-Guide-arm64-release.apk" \
-            "$unsigned_apk"
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify \
-            "$RUNNER_TEMP/NetHack5-ChatGPT-Guide-arm64-release.apk"
-          rm -f "$RUNNER_TEMP/nethack-guide.jks"
-
-      - name: Upload permanently signed APK
-        if: ${{ env.KEYSTORE_BASE64 != '' && env.KEYSTORE_PASSWORD != '' && env.KEY_ALIAS != '' && env.KEY_PASSWORD != '' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: NetHack5-ChatGPT-Guide-arm64-release
-          path: ${{ runner.temp }}/NetHack5-ChatGPT-Guide-arm64-release.apk
-          if-no-files-found: error
-          retention-days: 30
