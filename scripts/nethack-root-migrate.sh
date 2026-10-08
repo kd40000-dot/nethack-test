@@ -16,6 +16,10 @@ DATA="/data/user/0/$PKG"
 BACKUP="/sdcard/Download/NetHackGuide-migration"
 TAR="$BACKUP/private-data.tar.gz"
 OLDAPK="$BACKUP/original-signed.apk"
+# ForkFront uses getExternalFilesDir(null) by default on modern Android.
+# NetHack saves normally live HERE, not in the private data directory.
+EXTERNAL="/data/media/0/Android/data/$PKG/files"
+EXTERNAL_TAR="$BACKUP/external-game-files.tar.gz"
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
 info() { echo "[NetHack] $*"; }
@@ -38,6 +42,13 @@ restore_data() {
   tar -xzf "$TAR" -C "$DATA" || fail "Extract failed. Keep backup and seek recovery help."
   chown -R "$NEW_OWNER" "$DATA"
   restorecon -RF "$DATA" >/dev/null 2>&1 || info "Warning: restorecon reported a problem."
+  if [ -s "$EXTERNAL_TAR" ]; then
+    info "Restoring external NetHack save directory..."
+    mkdir -p "$EXTERNAL"
+    tar -xzf "$EXTERNAL_TAR" -C "$EXTERNAL" || fail "External save restore failed. Backup remains intact."
+    chown -R "$NEW_OWNER" "/data/media/0/Android/data/$PKG"
+    restorecon -RF "/data/media/0/Android/data/$PKG" >/dev/null 2>&1 || info "Warning: external restorecon reported a problem."
+  fi
   info "Restored files with package directory owner $NEW_OWNER"
 }
 
@@ -48,6 +59,7 @@ if [ "$MODE" = "backup" ]; then
   mkdir -p "$BACKUP"
   [ ! -e "$TAR" ] || fail "Existing backup found; refusing to overwrite $TAR"
   [ ! -e "$OLDAPK" ] || fail "Existing original APK found; refusing to overwrite $OLDAPK"
+  [ ! -e "$EXTERNAL_TAR" ] || fail "External backup already exists; refusing to overwrite $EXTERNAL_TAR"
   info "Ensure your current NetHack run has been SAVED and QUIT in-game."
   info "Stopping the app to create a consistent file backup."
   am force-stop "$PKG"
@@ -55,9 +67,19 @@ if [ "$MODE" = "backup" ]; then
   tar -czf "$TAR.tmp" -C "$DATA" . || fail "Backup failed. Old app is intact."
   mv "$TAR.tmp" "$TAR"
   check_archive
-  sha256sum "$TAR" "$OLDAPK" > "$BACKUP/SHA256SUMS.txt"
+  if [ -d "$EXTERNAL" ]; then
+    info "Backing up external game directory (contains save files on Android 10+)..."
+    tar -czf "$EXTERNAL_TAR.tmp" -C "$EXTERNAL" . || fail "External save backup failed. Original app remains installed."
+    mv "$EXTERNAL_TAR.tmp" "$EXTERNAL_TAR"
+    tar -tzf "$EXTERNAL_TAR" >/dev/null || fail "External save backup validation failed"
+    sha256sum "$TAR" "$OLDAPK" "$EXTERNAL_TAR" > "$BACKUP/SHA256SUMS.txt"
+  else
+    info "No external game directory found; internal data backup only."
+    sha256sum "$TAR" "$OLDAPK" > "$BACKUP/SHA256SUMS.txt"
+  fi
   info "Backup verified. Old app has NOT been uninstalled."
   info "Private files: $TAR"
+  [ ! -f "$EXTERNAL_TAR" ] || info "Dungeon saves / external files: $EXTERNAL_TAR"
   info "Original signed APK (for rollback): $OLDAPK"
   exit 0
 fi
@@ -66,6 +88,7 @@ NEWAPK="$2"
 [ -f "$NEWAPK" ] || fail "Specify the exact path to the downloaded NEW APK"
 [ -s "$OLDAPK" ] || fail "Original signed APK is missing; backup first."
 check_archive
+[ ! -f "$EXTERNAL_TAR" ] || tar -tzf "$EXTERNAL_TAR" >/dev/null || fail "External game save archive is invalid."
 [ -d "$DATA" ] || fail "Existing app data missing. Do not continue."
 info "Valid backup found."
 info "A signing-key change REQUIRES uninstalling this exact package first."
