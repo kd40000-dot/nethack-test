@@ -32,6 +32,7 @@ public final class GuideActivity extends ForkFront {
     private static final String FENNEC_PACKAGE = "org.mozilla.fennec_fdroid";
     private static final String CHATGPT_URL = "https://chatgpt.com/";
     private static final int MAX_PREFILL_URL_BYTES = 7600;
+    private DungeonHud dungeonHud;
 
     private static final String QUICK_QUESTION =
         "I have never played NetHack before. Inspect my CURRENT game state and " +
@@ -61,7 +62,8 @@ public final class GuideActivity extends ForkFront {
     @Override
     public void onCreate(Bundle state) {
         super.onCreate(state);
-        addHelpBar();
+        dungeonHud = new DungeonHud(this);
+        dungeonHud.attach();
     }
 
     private int dp(int value) {
@@ -84,6 +86,7 @@ public final class GuideActivity extends ForkFront {
         return view;
     }
 
+    // Retained only for reference; DungeonHud owns all current gameplay controls.
     private void addHelpBar() {
         View root = gameView("base_frame");
         if (!(root instanceof LinearLayout)) {
@@ -109,6 +112,10 @@ public final class GuideActivity extends ForkFront {
                 new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT));
     }
+
+    void quickHelp() { sendToFennec(QUICK_QUESTION); }
+
+    void askHelp() { showQuestion(); }
 
     private void showQuestion() {
         EditText input = new EditText(this);
@@ -208,6 +215,18 @@ public final class GuideActivity extends ForkFront {
                 ? "ChatGPT opened with your game-state question. Check it, then tap Send. Full text also copied."
                 : "Full game-state prompt copied. Paste in ChatGPT, then tap Send.",
                 Toast.LENGTH_LONG).show();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (dungeonHud != null) dungeonHud.resume();
+    }
+
+    @Override
+    protected void onPause() {
+        if (dungeonHud != null) dungeonHud.pause();
+        super.onPause();
     }
 
     private void showProblem(String message) {
