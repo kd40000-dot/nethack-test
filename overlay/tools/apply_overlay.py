@@ -54,6 +54,14 @@ def apply(upstream: Path) -> None:
     if "minSdkVersion = 7" not in gradle and "minSdkVersion = 23" not in gradle:
         raise RuntimeError("Unexpected upstream minSdkVersion")
     gradle = gradle.replace("minSdkVersion = 7", "minSdkVersion = 23", 1)
+    # Make versionCode strictly larger than the original preview (5000).
+    # Important: matching package name + higher versionCode is NOT enough;
+    # the signing certificate must also match or the user must migrate data.
+    if "versionCode = 5000" not in gradle:
+        raise RuntimeError("Unexpected upstream versionCode")
+    gradle = gradle.replace("versionCode = 5000", "versionCode = 5001", 1)
+    gradle = gradle.replace("versionName = '5.0.0'",
+                            "versionName = '5.0.0-guide-web1'", 1)
     gradle_path.write_text(gradle)
 
     sources = project / "overlay/src"
