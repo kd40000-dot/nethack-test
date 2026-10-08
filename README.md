@@ -36,13 +36,13 @@ The game engine does not run an AI model locally and does not automate any actio
 
 This repository contains only the Android guide overlay and scripts, not a copy of the upstream NetHack source tree. .github/workflows/build.yml fetches pinned upstream NetHack sources, overlays the Android Java Activity, compiles for arm64, and uploads an APK artifact. .github/workflows/publish.yml publishes a directly downloadable APK when the build passes.
 
-Package ID stays **com.tbd.nethack5.guide** (same as the first preview), currently versionCode **5001**.
+Package ID stays **com.tbd.nethack5.guide** (same as the first preview). Version codes now **increase automatically on every GitHub Actions run** (10,000 + workflow run number), enabling normal future updates.
 
-### IMPORTANT: first preview APK's private signing key is unavailable
+### IMPORTANT: earlier NetHack debug APK signing keys are unavailable
 
-The **first** app-arm64-v8a-debug.apk (versionCode 5000) was built on a disposable GitHub Actions runner, which automatically generated a per-run debug.keystore. Neither the keystore nor its private key was archived.
+The **earlier** `app-arm64-v8a-debug.apk` builds (including the initial version 5000 and the subsequent touch HUD preview) were built on disposable GitHub Actions runners which generated ephemeral debug keystores. None of those signing keys was archived, and successive debug APKs may have different signatures.
 
-This means **there is no way to create a normal in-place update using that exact signing certificate**. Android requires the signing identity to match, regardless of the APK's package name or whether the phone is rooted. Do **not** uninstall the old APK before backing up your saves.
+This means **there is no way to create a normal in-place update of an older CI-debug-signed APK using its original certificate**. Android requires the signing identity to match, regardless of the APK's package name or whether the phone is rooted. Do **not** uninstall the old APK before backing up your saves.
 
 ### Permanent signing for all future updates
 
@@ -54,7 +54,9 @@ Use your own signing keystore stored securely on your device and in GitHub Actio
 4. Run bash setup-permanent-signing.sh in Termux. It generates a private .p12 keystore **locally**, configures all four Actions secrets (NETHACK_KEYSTORE_BASE64, NETHACK_KEYSTORE_PASSWORD, NETHACK_KEY_ALIAS, NETHACK_KEY_PASSWORD) without checking a key into Git, and triggers a signed build.
 5. Back up the **keystore file and password offline**. Don't disclose either or commit them to public GitHub.
 
-Once the stable signing certificate is configured, future releases built from that keystore can install **in place** over one another, with app data/settings preserved.
+Once the stable signing certificate is configured, **all APKs, including debug/test builds**, will use it. The build refuses to upload/publish an APK if the persistent key is missing or the resulting certificate does not match.
+
+The published signed APK is named **NetHack5-Guide-arm64-updateable.apk** in the [guide-preview release](https://github.com/kd40000-dot/nethack-test/releases/tag/guide-preview). APKs built from the same persistent key can then install **in place** over one another, with game data/settings preserved. The key is private, unlike the publicly committed Andor's Trail test keystore.
 
 ### Root-assisted migration from the previous debug-signed APK
 
@@ -62,12 +64,12 @@ Once the stable signing certificate is configured, future releases built from th
 
 1. Download and inspect [scripts/nethack-root-migrate.sh](scripts/nethack-root-migrate.sh). Place it at /sdcard/Download/nethack-root-migrate.sh.
 2. Run this in Termux: su -c 'sh /sdcard/Download/nethack-root-migrate.sh backup'. This only reads and backs up; it **does not uninstall** anything. Check that it reports a verified backup under /sdcard/Download/NetHackGuide-migration/.
-3. Download the new **permanently signed** arm64 release APK into Download. Run: su -c 'sh /sdcard/Download/nethack-root-migrate.sh restore /sdcard/Download/NEW-APK-FILENAME.apk' (replacing the exact filename). This last step **must uninstall and reinstall** the app internally to change the signature, but restores its private files/settings afterward.
+3. Download the new **persistently signed** `NetHack5-Guide-arm64-updateable.apk` into Download. Run: su -c 'sh /sdcard/Download/nethack-root-migrate.sh restore /sdcard/Download/NEW-APK-FILENAME.apk' (replacing the exact filename). This last step **must uninstall and reinstall** the app internally to change the signature, but restores its private files/settings afterward.
 4. Verify NetHack runs with your saves and preferences. Keep the archived old APK and data tarball as a rollback point.
 
 The script attempts to reinstall the preserved original signed APK if the new APK fails to install. Root-assisted data restore is experimental; export/save your game independently before running it. Android Keystore-encrypted API keys from the old version are intentionally obsolete and may no longer be recoverable after uninstall.
 
-**DO NOT** install subsequent debug-signed previews as long-term updates: GitHub Actions' generated debug signing key changes between runners. Only the configured release key is stable.
+**Avoid the old `app-arm64-v8a-debug.apk` asset.** New signed builds only publish after a private key is configured, and the workflow verifies the certificate against that keystore. Save an offline copy of the signing key and password; losing them would make later updates require another migration.
 
 ## Privacy
 
