@@ -7,6 +7,7 @@ committed to the guide repository.
 """
 from pathlib import Path
 import shutil
+import os
 import sys
 import xml.etree.ElementTree as ET
 
@@ -59,9 +60,34 @@ def apply(upstream: Path) -> None:
     # the signing certificate must also match or the user must migrate data.
     if "versionCode = 5000" not in gradle:
         raise RuntimeError("Unexpected upstream versionCode")
-    gradle = gradle.replace("versionCode = 5000", "versionCode = 5002", 1)
+    gradle = gradle.replace("versionCode = 5000", "versionCode = 5003", 1)
     gradle = gradle.replace("versionName = '5.0.0'",
-                            "versionName = '5.0.0-guide-hud1'", 1)
+                            "versionName = '5.0.0-guide-hud2'", 1)
+    # Mirror Andor's Trail's stable test keystore, rather than allowing Gradle
+    # to auto-generate a new ~/.android/debug.keystore on every CI runner.
+    # A PUBLIC test key is fine for reproducible community test APKs, but it
+    # does NOT provide the protections of a private production signing key.
+    keystore = os.environ.get("NETHACK_STABLE_KEYSTORE", "")
+    if not keystore or not Path(keystore).is_file():
+        raise RuntimeError("Stable test signing keystore missing; refuse ephemeral build")
+    signing = """
+  signingConfigs {
+    stableTest {
+      storeFile = file(System.getenv('NETHACK_STABLE_KEYSTORE'))
+      storePassword = System.getenv('NETHACK_STABLE_STORE_PASSWORD')
+      keyAlias = System.getenv('NETHACK_STABLE_KEY_ALIAS')
+      keyPassword = System.getenv('NETHACK_STABLE_KEY_PASSWORD')
+    }
+  }
+  buildTypes {
+    debug {
+      signingConfig = signingConfigs.stableTest
+    }
+  }
+"""
+    if "signingConfigs {" in gradle:
+        raise RuntimeError("Unexpected upstream signing config; examine before injecting")
+    gradle = gradle.replace("android {", "android {" + signing, 1)
     gradle_path.write_text(gradle)
 
     sources = project / "overlay/src"
@@ -81,7 +107,7 @@ def apply(upstream: Path) -> None:
     assert "com.tbd.NetHack5.ai.GuideActivity" in manifest_path.read_text()
     print("Guide overlay applied successfully")
     print("Application ID: com.tbd.nethack5.guide")
-    print("OpenAI API key: not included; entered/encrypted on device")
+    print("Signing: fixed shared test key, fingerprint checked by GitHub Actions")
 
 
 if __name__ == "__main__":
