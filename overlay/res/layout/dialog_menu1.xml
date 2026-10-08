@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:background="#DE0D1110"
+    android:clickable="true"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <LinearLayout android:orientation="vertical"
+        android:layout_centerInParent="true"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_margin="8dp"
+        android:padding="7dp"
+        android:background="@drawable/stone_dialog">
+        <com.tbd.forkfront.NH_TextView android:id="@+id/title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="44dp"
+            android:gravity="center_vertical"
+            android:textSize="19sp"
+            android:textStyle="bold"
+            android:textColor="#F3E6B6"
+            android:padding="10dp"/>
+        <ListView android:id="@+id/menu_list"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:padding="3dp"
+            android:cacheColorHint="#00000000"
+            android:divider="#5C675E"
+            android:dividerHeight="4dp"
+            android:scrollbarStyle="outsideOverlay"/>
+    </LinearLayout>
+</RelativeLayout>
