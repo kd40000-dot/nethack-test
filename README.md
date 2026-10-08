@@ -4,6 +4,23 @@ An Android overlay for [JodiJodington/NetHack-Android](https://github.com/JodiJo
 
 > This is a hobby/test build, not affiliated with OpenAI or NetHack's maintainers. Physical-device testing is required.
 
+## Touch-first HUD (preview)
+
+The v5002 prototype introduces a Shattered Pixel Dungeon-inspired dark-stone HUD (visual inspiration only, not copied game art). The top area displays HP, dungeon depth, status ailments, and always-visible shortcuts to the **current weapon, armor, rings, and amulet** reports from NetHack. The bottom bar has six touch actions:
+
+- **Bag:** open the existing NetHack inventory with larger icon rows and status subtitles.
+- **Gear:** inspect wielded/worn equipment, wield, wear, remove or swap gear.
+- **Act:** pick up, look, apply, search, open/close, eat, drink, read, drop and wait.
+- **Explore:** stairs, travel, examine, search and wait.
+- **Magic:** fire, throw, zap, cast, read, wield and kick.
+- **More:** ChatGPT quick help and questions in Fennec, virtual keyboard for uncommon commands, settings, help, extra commands and Cancel.
+
+A small contextual action above the bar uses current HUD status and already-discovered map tiles to suggest an action (e.g. hunger, low HP, doors or items). Suggestions are deliberately conservative and do not perform actions automatically. NetHack controls item selection and directions after you tap a command. Tapping the dungeon still moves the character. The previous many-button command grid is hidden.
+
+**Current limitations:** Equipment is not yet rendered as a persistent full character paper-doll; tapping a slot queries the actual NetHack equip report. The inventory still uses NetHack's native item menus with a new theme; it is not yet a custom draggable equipment grid. Contextual suggestions can be wrong if an ambiguous tile glyph obscures the real terrain. More advanced commands remain in the keyboard fallback.
+
+**APK signing reminder:** The previously published debug-signed APKs have ephemeral signatures. Until you configure the permanent signing key, newly built debug APKs cannot replace the existing installation through a normal Android update. Use the documented backup/migration process only after verifying the full backup.
+
 ## In-game controls
 
 - **✦ Quick help:** read current visible NetHack state and create a proactive survival/progression question.
