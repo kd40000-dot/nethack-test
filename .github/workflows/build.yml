@@ -35,6 +35,27 @@ jobs:
           submodules: false
           path: upstream
 
+      - name: Configure persistent signing for all APK builds
+        shell: bash
+        env:
+          SIGNING_STORE_BASE64: ${{ secrets.NETHACK_KEYSTORE_BASE64 }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.NETHACK_KEYSTORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.NETHACK_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.NETHACK_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SIGNING_STORE_BASE64" ] || [ -z "$SIGNING_STORE_PASSWORD" ] || [ -z "$SIGNING_KEY_ALIAS" ] || [ -z "$SIGNING_KEY_PASSWORD" ]; then
+            echo "::error::Persistent signing secrets are missing. Configure them using scripts/setup-permanent-signing.sh on your own device; unsigned/ephemeral APK publication is disabled."
+            exit 1
+          fi
+          printf '%s' "$SIGNING_STORE_BASE64" | base64 --decode > "$RUNNER_TEMP/nethack-guide-signing.p12"
+          chmod 600 "$RUNNER_TEMP/nethack-guide-signing.p12"
+          echo "NETHACK_STABLE_KEYSTORE=$RUNNER_TEMP/nethack-guide-signing.p12" >> "$GITHUB_ENV"
+          echo "NETHACK_STABLE_STORE_PASSWORD=$SIGNING_STORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "NETHACK_STABLE_KEY_ALIAS=$SIGNING_KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "NETHACK_STABLE_KEY_PASSWORD=$SIGNING_KEY_PASSWORD" >> "$GITHUB_ENV"
+          keytool -list -keystore "$RUNNER_TEMP/nethack-guide-signing.p12" -storepass "$SIGNING_STORE_PASSWORD" -alias "$SIGNING_KEY_ALIAS" >/dev/null
+
       - name: Apply guide patch
         run: |
           python3 guide/overlay/tools/apply_overlay.py upstream
