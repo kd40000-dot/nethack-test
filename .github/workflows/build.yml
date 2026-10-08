@@ -1,0 +1,113 @@
+name: Build NetHack 5 with ChatGPT guide
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build.yml'
+      - 'overlay/**'
+      - 'README.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      KEYSTORE_BASE64: ${{ secrets.NETHACK_KEYSTORE_BASE64 }}
+      KEYSTORE_PASSWORD: ${{ secrets.NETHACK_KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.NETHACK_KEY_ALIAS }}
+      KEY_PASSWORD: ${{ secrets.NETHACK_KEY_PASSWORD }}
+    steps:
+      - name: Check out guide overlay
+        uses: actions/checkout@v4
+        with:
+          path: guide
+
+      - name: Check out pinned upstream NetHack 5
+        uses: actions/checkout@v4
+        with:
+          repository: JodiJodington/NetHack-Android
+          ref: f7c0d7851b854cc7b1ca09b2c193e8620f2962d9
+          submodules: false
+          path: upstream
+
+      - name: Apply guide patch
+        run: |
+          python3 guide/overlay/tools/apply_overlay.py upstream
+          python3 -m py_compile guide/overlay/tools/apply_overlay.py
+          grep -q 'com.tbd.NetHack5.ai.GuideActivity' upstream/sys/android/app/AndroidManifest.xml
+          grep -q 'java.srcDirs' upstream/sys/android/app/build.gradle
+
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y gcc-multilib bison flex make
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: upstream/sys/android/gradle/wrapper/gradle-wrapper.properties
+
+      - name: Set up Android SDK and NDK
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 9123335
+          packages: 'platforms;android-36 ndk;30.0.14904198 build-tools;36.0.0'
+
+      - name: Build native NetHack library for arm64-v8a
+        working-directory: upstream
+        shell: bash
+        run: |
+          sed -i -e "s,NDK = .*,NDK = $ANDROID_HOME/ndk/30.0.14904198,g" sys/android/Makefile.src sys/android/Makefile.top
+          sed -i -e 's,ABI = .*,ABI = arm64-v8a,g' sys/android/Makefile.src sys/android/Makefile.top
+          (cd sys/android && sh ./setup.sh)
+          make fetch-lua
+          make install
+
+      - name: Build testable debug APK
+        working-directory: upstream/sys/android
+        run: bash ./gradlew :app:assembleDebug --stacktrace --no-daemon
+
+      - name: Upload debug APK for physical testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: NetHack5-ChatGPT-Guide-arm64-debug
+          path: upstream/sys/android/app/build/outputs/apk/debug/*arm64*v8a*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Build and sign updateable APK with configured permanent key
+        if: ${{ env.KEYSTORE_BASE64 != '' && env.KEYSTORE_PASSWORD != '' && env.KEY_ALIAS != '' && env.KEY_PASSWORD != '' }}
+        working-directory: upstream/sys/android
+        shell: bash
+        run: |
+          bash ./gradlew :app:assembleRelease --stacktrace --no-daemon
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/nethack-guide.jks"
+          unsigned_apk="$(find app/build/outputs/apk/release -maxdepth 1 -name '*arm64*v8a*unsigned*.apk' -print -quit)"
+          test -n "$unsigned_apk"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" sign \
+            --ks "$RUNNER_TEMP/nethack-guide.jks" \
+            --ks-pass env:KEYSTORE_PASSWORD \
+            --ks-key-alias "$KEY_ALIAS" \
+            --key-pass env:KEY_PASSWORD \
+            --out "$RUNNER_TEMP/NetHack5-ChatGPT-Guide-arm64-release.apk" \
+            "$unsigned_apk"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify \
+            "$RUNNER_TEMP/NetHack5-ChatGPT-Guide-arm64-release.apk"
+          rm -f "$RUNNER_TEMP/nethack-guide.jks"
+
+      - name: Upload permanently signed APK
+        if: ${{ env.KEYSTORE_BASE64 != '' && env.KEYSTORE_PASSWORD != '' && env.KEY_ALIAS != '' && env.KEY_PASSWORD != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: NetHack5-ChatGPT-Guide-arm64-release
+          path: ${{ runner.temp }}/NetHack5-ChatGPT-Guide-arm64-release.apk
+          if-no-files-found: error
+          retention-days: 30
