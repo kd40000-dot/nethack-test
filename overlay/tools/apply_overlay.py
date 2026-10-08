@@ -80,6 +80,7 @@ def apply(upstream: Path) -> None:
   signingConfigs {
     stableTest {
       storeFile = file(System.getenv('NETHACK_STABLE_KEYSTORE'))
+      storeType = 'pkcs12'
       storePassword = System.getenv('NETHACK_STABLE_STORE_PASSWORD')
       keyAlias = System.getenv('NETHACK_STABLE_KEY_ALIAS')
       keyPassword = System.getenv('NETHACK_STABLE_KEY_PASSWORD')
