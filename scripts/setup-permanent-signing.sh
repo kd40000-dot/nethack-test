@@ -22,14 +22,13 @@ gh auth status >/dev/null || {
 }
 mkdir -p "$KEYDIR"
 if [ -e "$KEYFILE" ]; then
-  echo "Key already exists at $KEYFILE; refusing to replace your signing identity."
-  echo "If Actions secrets need restoring, configure them from this keystore."
-  exit 1
+  echo "Reusing your existing key: $KEYFILE"
+  echo "Its signing identity will NOT be changed. You can safely restore GitHub secrets."
+else
+  echo "Creating your PERSONAL signing key. Keep an offline backup of the .p12 file"
+  echo "and its password; a lost key means future APKs cannot update one another."
 fi
-
-echo "Creating your PERSONAL signing key. Keep an offline backup of the .p12 file"
-echo "and its password; a lost key means future APKs cannot update one another."
-read -r -s -p "Choose a strong keystore password (8+ characters): " PASSWORD
+read -r -s -p "Enter the keystore password (choose one if creating a key, 8+ characters): " PASSWORD
 printf '\n'
 if [ "$(printf '%s' "$PASSWORD" | wc -c)" -lt 8 ]; then
   echo "Password is too short."
@@ -40,11 +39,18 @@ printf '\n'
 [ "$PASSWORD" = "$VERIFY_PASSWORD" ] || { echo "Passwords did not match."; exit 1; }
 unset VERIFY_PASSWORD
 
-keytool -genkeypair -noprompt \
-  -alias "$ALIAS" -keyalg RSA -keysize 3072 -validity 10000 \
-  -keystore "$KEYFILE" -storetype PKCS12 \
-  -storepass "$PASSWORD" -keypass "$PASSWORD" \
-  -dname "CN=NetHack Guide Personal Signing, OU=Android, O=Personal, C=ES"
+if [ ! -e "$KEYFILE" ]; then
+  keytool -genkeypair -noprompt \
+    -alias "$ALIAS" -keyalg RSA -keysize 3072 -validity 10000 \
+    -keystore "$KEYFILE" -storetype PKCS12 \
+    -storepass "$PASSWORD" -keypass "$PASSWORD" \
+    -dname "CN=NetHack Guide Personal Signing, OU=Android, O=Personal, C=ES"
+fi
+# If keystore exists already, verify password and alias BEFORE touching secrets.
+keytool -list -keystore "$KEYFILE" -storepass "$PASSWORD" -alias "$ALIAS" >/dev/null || {
+  echo "Wrong password or key alias. Existing key and GitHub secrets were not changed."
+  exit 1
+}
 
 echo "Setting encrypted Actions secrets for $REPO..."
 base64 -w 0 "$KEYFILE" | gh secret set NETHACK_KEYSTORE_BASE64 --repo "$REPO"
