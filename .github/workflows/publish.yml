@@ -1,0 +1,60 @@
+name: Publish directly downloadable NetHack guide APK
+
+on:
+  workflow_run:
+    workflows: ["Build NetHack 5 with ChatGPT guide"]
+    types: [completed]
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  preview-release:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download built debug APK
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: NetHack5-ChatGPT-Guide-arm64-debug
+          path: artifact/debug
+
+      - name: Download signed release APK when configured
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: NetHack5-ChatGPT-Guide-arm64-release
+          path: artifact/release
+
+      - name: Verify APK archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          debug="$(find artifact/debug -name '*.apk' -print -quit)"
+          test -n "$debug"
+          unzip -t "$debug" > /dev/null
+          if test -f artifact/release/NetHack5-ChatGPT-Guide-arm64-release.apk; then
+            unzip -t artifact/release/NetHack5-ChatGPT-Guide-arm64-release.apk > /dev/null
+          fi
+
+      - name: Publish direct APK assets in a preview release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if ! gh release view guide-preview > /dev/null 2>&1; then
+            gh release create guide-preview --target main --prerelease \
+              --title 'NetHack 5 ChatGPT Guide (preview)' \
+              --notes 'Experimental in-game AI guide. Install arm64 APK at your own risk; live-device testing is still required. The debug APK is not permanently signed. A stable updateable release APK is published only when a permanent signing key is configured.'
+          fi
+          debug="$(find artifact/debug -name '*.apk' -print -quit)"
+          gh release upload guide-preview "$debug#NetHack5-ChatGPT-Guide-arm64-debug.apk" --clobber
+          if test -f artifact/release/NetHack5-ChatGPT-Guide-arm64-release.apk; then
+            gh release upload guide-preview artifact/release/NetHack5-ChatGPT-Guide-arm64-release.apk --clobber
+          fi
