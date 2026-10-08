@@ -60,7 +60,14 @@ def apply(upstream: Path) -> None:
     # the signing certificate must also match or the user must migrate data.
     if "versionCode = 5000" not in gradle:
         raise RuntimeError("Unexpected upstream versionCode")
-    gradle = gradle.replace("versionCode = 5000", "versionCode = 5003", 1)
+    # Each GitHub Actions run gets a strictly increasing Android versionCode,
+    # so updates install normally after the one-time certificate migration.
+    run_number = int(os.environ.get("GITHUB_RUN_NUMBER", "1"))
+    version_code = 10000 + run_number
+    if version_code > 2100000000:
+        raise RuntimeError("Android versionCode overflow")
+    gradle = gradle.replace("versionCode = 5000",
+                            "versionCode = " + str(version_code), 1)
     gradle = gradle.replace("versionName = '5.0.0'",
                             "versionName = '5.0.0-guide-hud2'", 1)
     # Mirror Andor's Trail's stable test keystore, rather than allowing Gradle
@@ -107,7 +114,8 @@ def apply(upstream: Path) -> None:
     assert "com.tbd.NetHack5.ai.GuideActivity" in manifest_path.read_text()
     print("Guide overlay applied successfully")
     print("Application ID: com.tbd.nethack5.guide")
-    print("Signing: fixed shared test key, fingerprint checked by GitHub Actions")
+    print("Signing: private persistent key; CI verifies APK certificate")
+    print("Android versionCode:", version_code)
 
 
 if __name__ == "__main__":
