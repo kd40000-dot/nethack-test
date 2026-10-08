@@ -59,9 +59,9 @@ def apply(upstream: Path) -> None:
     # the signing certificate must also match or the user must migrate data.
     if "versionCode = 5000" not in gradle:
         raise RuntimeError("Unexpected upstream versionCode")
-    gradle = gradle.replace("versionCode = 5000", "versionCode = 5001", 1)
+    gradle = gradle.replace("versionCode = 5000", "versionCode = 5002", 1)
     gradle = gradle.replace("versionName = '5.0.0'",
-                            "versionName = '5.0.0-guide-web1'", 1)
+                            "versionName = '5.0.0-guide-hud1'", 1)
     gradle_path.write_text(gradle)
 
     sources = project / "overlay/src"
@@ -70,6 +70,12 @@ def apply(upstream: Path) -> None:
         target = installed / source.relative_to(sources)
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, target)
+
+    # Application overlays replace matching library resource names at merge time.
+    for source in (project / "overlay/res").rglob("*.xml"):
+        dest = app / "res" / source.relative_to(project / "overlay/res")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, dest)
 
     assert (installed / "com/tbd/NetHack5/ai/GuideActivity.java").is_file()
     assert "com.tbd.NetHack5.ai.GuideActivity" in manifest_path.read_text()
