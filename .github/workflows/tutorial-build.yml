@@ -37,13 +37,13 @@ jobs:
         run: |
           set -euo pipefail
           test -s guide/build/tutorial-sources.tar.xz
-          echo 'c043d8d78af81794cd1f9d4ae82a65ed0d07a043476db8ec178a42820828d366  guide/build/tutorial-sources.tar.xz' | sha256sum -c -
+          echo 'b7d4d1dd40b3cbb06532a3f972da271dcb8ca77c3533ced07bcc1f51bb771308  guide/build/tutorial-sources.tar.xz' | sha256sum -c -
           mkdir -p guide/tutorial
           tar -xJf guide/build/tutorial-sources.tar.xz -C guide/tutorial
           python3 guide/tutorial/tools/apply_to_upstream.py upstream
           python3 -m py_compile guide/tutorial/tools/apply_to_upstream.py
           grep -q com.tbd.NetHack5.tutorial.TutorialActivity upstream/sys/android/app/AndroidManifest.xml
-          grep -q "versionCode = 50030" upstream/sys/android/app/build.gradle
+          grep -q "versionCode = 50031" upstream/sys/android/app/build.gradle
           if grep -R -q -E 'chatgpt.com|api.openai.com|github.com' upstream/sys/android/app/src; then
             echo 'Notice: unexpected online integration URL in tutorial application sources'
             exit 1
@@ -76,6 +76,12 @@ jobs:
           (cd sys/android && sh ./setup.sh)
           make fetch-lua
           make install
+
+      - name: Generate accurate monster tile catalog from compiled NetHack 5
+        run: |
+          python3 guide/tutorial/tools/generate_monster_catalog.py upstream
+          grep -q '"fox"' upstream/sys/android/app/src/com/tbd/NetHack5/tutorial/MonsterCatalog.java
+          grep -q '"kitten"' upstream/sys/android/app/src/com/tbd/NetHack5/tutorial/MonsterCatalog.java
 
       - name: Build offline Tutorial Mode Android APK
         working-directory: upstream/sys/android
