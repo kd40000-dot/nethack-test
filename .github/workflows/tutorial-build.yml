@@ -18,6 +18,9 @@ concurrency:
 jobs:
   android:
     runs-on: ubuntu-24.04
+    env:
+      NETHACK_STABLE_KEYSTORE: ${{ github.workspace }}/guide/signing/tutorial-update-test.p12
+      NETHACK_STABLE_PASSWORD: NetHack-Tutorial-Public-Test-Key-2026
     timeout-minutes: 90
     steps:
       - name: Check out tutorial source bundle
@@ -33,17 +36,31 @@ jobs:
           submodules: false
           path: upstream
 
+      - name: Require the same long-lived test signing identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "$NETHACK_STABLE_KEYSTORE"
+          sha256sum "$NETHACK_STABLE_KEYSTORE"
+          keytool -exportcert -keystore "$NETHACK_STABLE_KEYSTORE" \
+            -storepass "$NETHACK_STABLE_PASSWORD" -alias nethack-tutorial \
+            -file "$RUNNER_TEMP/tutorial-identity.der" > /dev/null
+          cert="$(openssl x509 -inform DER -in "$RUNNER_TEMP/tutorial-identity.der" \
+            -noout -fingerprint -sha256 | cut -d= -f2 | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          test "$cert" = "ab65aa9dd3984387346d15cdc20f388487457a32acba5e93f65d114beb4bd1dc"
+          echo "Pinned NetHack tutorial update identity verified: $cert"
+
       - name: Verify and apply the offline tutorial patch
         run: |
           set -euo pipefail
           test -s guide/build/tutorial-sources.tar.xz
-          echo '199baacd1e0146fd65c27960a674b371dd425f9ec49f3791f101b635c892ef0f  guide/build/tutorial-sources.tar.xz' | sha256sum -c -
+          echo '10cc44216896d6d521eba65e1d53b5f326eb5d8e179b1b333d5f57d536f52384  guide/build/tutorial-sources.tar.xz' | sha256sum -c -
           mkdir -p guide/tutorial
           tar -xJf guide/build/tutorial-sources.tar.xz -C guide/tutorial
           python3 guide/tutorial/tools/apply_to_upstream.py upstream
           python3 -m py_compile guide/tutorial/tools/apply_to_upstream.py
           grep -q com.tbd.NetHack5.tutorial.TutorialActivity upstream/sys/android/app/AndroidManifest.xml
-          grep -q "versionCode = 50031" upstream/sys/android/app/build.gradle
+          grep -q "versionCode = 50032" upstream/sys/android/app/build.gradle
           if grep -R -q -E 'chatgpt.com|api.openai.com|github.com' upstream/sys/android/app/src; then
             echo 'Notice: unexpected online integration URL in tutorial application sources'
             exit 1
@@ -83,6 +100,13 @@ jobs:
           grep -q '"fox"' upstream/sys/android/app/src/com/tbd/NetHack5/tutorial/MonsterCatalog.java
           grep -q '"kitten"' upstream/sys/android/app/src/com/tbd/NetHack5/tutorial/MonsterCatalog.java
 
+      - name: Generate the ground-object tile catalog from real native graphics
+        shell: bash
+        run: |
+          python3 guide/tutorial/tools/generate_object_catalog.py upstream
+          grep -q 'boolean isGroundObjectTile' upstream/sys/android/app/src/com/tbd/NetHack5/tutorial/ObjectCatalog.java
+          python3 guide/tutorial/tools/test_object_catalog.py
+          
       - name: Build offline Tutorial Mode Android APK
         working-directory: upstream/sys/android
         run: bash ./gradlew :app:assembleDebug --stacktrace --no-daemon
@@ -95,16 +119,20 @@ jobs:
           apk="$(find app/build/outputs/apk/debug -name '*arm64*v8a*.apk' -print -quit)"
           test -n "$apk"
           unzip -t "$apk" >/dev/null
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$apk"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$apk" > "$RUNNER_TEMP/tutorial-apk-certificate.txt"
+          cat "$RUNNER_TEMP/tutorial-apk-certificate.txt"
+          actual="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/tutorial-apk-certificate.txt" | tr -d '\r')"
+          test "$actual" = "ab65aa9dd3984387346d15cdc20f388487457a32acba5e93f65d114beb4bd1dc"
+          echo "APK uses pinned long-lived certificate: $actual"
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" | grep -E '^package:|^native-code:'
           test -n "$(unzip -Z1 "$apk" | grep 'lib/arm64-v8a/.*\.so$')"
-          cp "$apk" "$RUNNER_TEMP/NetHack5-TutorialMode-arm64-debug.apk"
+          cp "$apk" "$RUNNER_TEMP/NetHack5-TutorialMode-arm64-stable.apk"
           sha256sum "$RUNNER_TEMP/NetHack5-TutorialMode-arm64-debug.apk"
 
       - name: Upload directly installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: NetHack5-TutorialMode-arm64-debug
+          name: NetHack5-TutorialMode-arm64-stable-test
           path: ${{ runner.temp }}/NetHack5-TutorialMode-arm64-debug.apk
           if-no-files-found: error
           retention-days: 30
@@ -118,7 +146,7 @@ jobs:
           set -euo pipefail
           if ! gh release view tutorial-preview >/dev/null 2>&1; then
             gh release create tutorial-preview --target "$GITHUB_SHA" --prerelease \
-              --title 'NetHack 5 — Offline Tutorial Mode (test APK)' \
-              --notes 'Offline, preview-inspired Tutorial Mode. ARM64 Android test build. DEBUG-SIGNED with a temporary GitHub Actions key. It will not upgrade an older differently signed NetHack APK in place; back up saves first. Physical-device testing required.'
+              --title 'NetHack 5 — Offline Tutorial Mode (stable test certificate)' \
+              --notes 'Offline, preview-inspired Tutorial Mode. ARM64 Android test build. STABLE TEST-SIGNED with the pinned project-specific public certificate (SHA-256 AB65AA9DD3984387346D15CDC20F388487457A32ACBA5E93F65D114BEB4BD1DC). Future APK updates signed using this certificate should install over this version. Older debug APKs used disposable keys and REQUIRE a one-time data-preserving migration. Back up saves before that transition. The test signing keystore is publicly available; do not use it for security-sensitive applications. Physical-device testing is still required.'
           fi
           gh release upload tutorial-preview "$RUNNER_TEMP/NetHack5-TutorialMode-arm64-debug.apk" --clobber
