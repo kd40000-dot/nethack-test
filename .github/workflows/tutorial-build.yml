@@ -133,7 +133,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: NetHack5-TutorialMode-arm64-stable-test
-          path: ${{ runner.temp }}/NetHack5-TutorialMode-arm64-debug.apk
+          path: ${{ runner.temp }}/NetHack5-TutorialMode-arm64-stable.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -149,4 +149,4 @@ jobs:
               --title 'NetHack 5 — Offline Tutorial Mode (stable test certificate)' \
               --notes 'Offline, preview-inspired Tutorial Mode. ARM64 Android test build. STABLE TEST-SIGNED with the pinned project-specific public certificate (SHA-256 AB65AA9DD3984387346D15CDC20F388487457A32ACBA5E93F65D114BEB4BD1DC). Future APK updates signed using this certificate should install over this version. Older debug APKs used disposable keys and REQUIRE a one-time data-preserving migration. Back up saves before that transition. The test signing keystore is publicly available; do not use it for security-sensitive applications. Physical-device testing is still required.'
           fi
-          gh release upload tutorial-preview "$RUNNER_TEMP/NetHack5-TutorialMode-arm64-debug.apk" --clobber
+          gh release upload tutorial-preview "$RUNNER_TEMP/NetHack5-TutorialMode-arm64-stable.apk" --clobber
