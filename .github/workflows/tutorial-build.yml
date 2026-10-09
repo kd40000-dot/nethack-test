@@ -54,13 +54,13 @@ jobs:
         run: |
           set -euo pipefail
           test -s guide/build/tutorial-sources.tar.xz
-          echo '032401646796c87a77cfedaa8d756e187fe1e63bcb324a339eb37439de4a79be  guide/build/tutorial-sources.tar.xz' | sha256sum -c -
+          echo 'f542a53c43f1b2f88606d35df5ef4bb9c42875ae682f595c12c902f46e9d01da  guide/build/tutorial-sources.tar.xz' | sha256sum -c -
           mkdir -p guide/tutorial
           tar -xJf guide/build/tutorial-sources.tar.xz -C guide/tutorial
           python3 guide/tutorial/tools/apply_to_upstream.py upstream
           python3 -m py_compile guide/tutorial/tools/apply_to_upstream.py
           grep -q com.tbd.NetHack5.tutorial.TutorialActivity upstream/sys/android/app/AndroidManifest.xml
-          grep -q "versionCode = 50034" upstream/sys/android/app/build.gradle
+          grep -q "versionCode = 50035" upstream/sys/android/app/build.gradle
           if grep -R -q -E 'chatgpt.com|api.openai.com|api.github.com|raw.githubusercontent.com' upstream/sys/android/app/src; then
             echo 'Notice: unexpected online integration URL in tutorial application sources'
             exit 1
@@ -79,6 +79,14 @@ jobs:
           cache: gradle
           cache-dependency-path: upstream/sys/android/gradle/wrapper/gradle-wrapper.properties
 
+      - name: Generate real NetHack 5 weapon and projectile stats
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 guide/tutorial/tools/generate_weapon_stats.py upstream
+          grep -q '"elven arrow"' upstream/sys/android/app/src/com/tbd/NetHack5/tutorial/WeaponStats.java
+          grep -q '"1d7","1d6"' upstream/sys/android/app/src/com/tbd/NetHack5/tutorial/WeaponStats.java
+
       - name: Test global help lookup and unidentified item safety
         shell: bash
         run: |
@@ -87,6 +95,7 @@ jobs:
           src=guide/tutorial/app/src/main/java/com/tbd/NetHack5/tutorial
           javac -encoding UTF-8 -d "$RUNNER_TEMP/tutorial-unit-classes" \
             "$src/WikiLibrary.java" "$src/GroundMessage.java" "$src/TutorialEngine.java" \
+            upstream/sys/android/app/src/com/tbd/NetHack5/tutorial/WeaponStats.java \
             guide/tutorial/tests/{WikiLibraryTest,GroundMessageTest,HelpResolverTest,TutorialEngineTest}.java
           for clazz in WikiLibraryTest com.tbd.NetHack5.tutorial.GroundMessageTest \
                        com.tbd.NetHack5.tutorial.HelpResolverTest TutorialEngineTest; do
