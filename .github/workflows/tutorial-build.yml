@@ -54,13 +54,13 @@ jobs:
         run: |
           set -euo pipefail
           test -s guide/build/tutorial-sources.tar.xz
-          echo '10cc44216896d6d521eba65e1d53b5f326eb5d8e179b1b333d5f57d536f52384  guide/build/tutorial-sources.tar.xz' | sha256sum -c -
+          echo '0b9aba2f1eb7275b42762d9982484923aad73ee2765c4a1d8d53244a2a16ed49  guide/build/tutorial-sources.tar.xz' | sha256sum -c -
           mkdir -p guide/tutorial
           tar -xJf guide/build/tutorial-sources.tar.xz -C guide/tutorial
           python3 guide/tutorial/tools/apply_to_upstream.py upstream
           python3 -m py_compile guide/tutorial/tools/apply_to_upstream.py
           grep -q com.tbd.NetHack5.tutorial.TutorialActivity upstream/sys/android/app/AndroidManifest.xml
-          grep -q "versionCode = 50032" upstream/sys/android/app/build.gradle
+          grep -q "versionCode = 50033" upstream/sys/android/app/build.gradle
           if grep -R -q -E 'chatgpt.com|api.openai.com|github.com' upstream/sys/android/app/src; then
             echo 'Notice: unexpected online integration URL in tutorial application sources'
             exit 1
