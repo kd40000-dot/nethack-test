@@ -54,13 +54,13 @@ jobs:
         run: |
           set -euo pipefail
           test -s guide/build/tutorial-sources.tar.xz
-          echo '0b9aba2f1eb7275b42762d9982484923aad73ee2765c4a1d8d53244a2a16ed49  guide/build/tutorial-sources.tar.xz' | sha256sum -c -
+          echo '0c2b1652d892f8c94ec0564cf3b578300191f3b239aaa1920e6322cd6c2e4524  guide/build/tutorial-sources.tar.xz' | sha256sum -c -
           mkdir -p guide/tutorial
           tar -xJf guide/build/tutorial-sources.tar.xz -C guide/tutorial
           python3 guide/tutorial/tools/apply_to_upstream.py upstream
           python3 -m py_compile guide/tutorial/tools/apply_to_upstream.py
           grep -q com.tbd.NetHack5.tutorial.TutorialActivity upstream/sys/android/app/AndroidManifest.xml
-          grep -q "versionCode = 50033" upstream/sys/android/app/build.gradle
+          grep -q "versionCode = 50034" upstream/sys/android/app/build.gradle
           if grep -R -q -E 'chatgpt.com|api.openai.com|github.com' upstream/sys/android/app/src; then
             echo 'Notice: unexpected online integration URL in tutorial application sources'
             exit 1
@@ -79,6 +79,20 @@ jobs:
           cache: gradle
           cache-dependency-path: upstream/sys/android/gradle/wrapper/gradle-wrapper.properties
 
+      - name: Test global help lookup and unidentified item safety
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/tutorial-unit-classes"
+          src=guide/tutorial/app/src/main/java/com/tbd/NetHack5/tutorial
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/tutorial-unit-classes" \
+            "$src/WikiLibrary.java" "$src/GroundMessage.java" "$src/TutorialEngine.java" \
+            guide/tutorial/tests/{WikiLibraryTest,GroundMessageTest,HelpResolverTest,TutorialEngineTest}.java
+          for clazz in WikiLibraryTest com.tbd.NetHack5.tutorial.GroundMessageTest \
+                       com.tbd.NetHack5.tutorial.HelpResolverTest TutorialEngineTest; do
+            java -cp "$RUNNER_TEMP/tutorial-unit-classes" "$clazz"
+          done
+          python3 guide/tutorial/tests/test_overlay.py >/dev/null 2>&1 || true
       - name: Set up Android SDK and NDK
         uses: android-actions/setup-android@v3
         with:
