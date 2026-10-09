@@ -1,0 +1,118 @@
+name: Build offline NetHack Tutorial Mode APK
+
+on:
+  push:
+    branches: [tutorial-mode-build]
+    paths:
+      - 'build/tutorial-sources.tar.xz'
+      - '.github/workflows/tutorial-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nethack-tutorial-mode-test
+  cancel-in-progress: true
+
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Check out tutorial source bundle
+        uses: actions/checkout@v4
+        with:
+          path: guide
+
+      - name: Check out pinned NetHack 5 game source
+        uses: actions/checkout@v4
+        with:
+          repository: JodiJodington/NetHack-Android
+          ref: f7c0d7851b854cc7b1ca09b2c193e8620f2962d9
+          submodules: false
+          path: upstream
+
+      - name: Verify and apply the offline tutorial patch
+        run: |
+          set -euo pipefail
+          test -s guide/build/tutorial-sources.tar.xz
+          echo 'c043d8d78af81794cd1f9d4ae82a65ed0d07a043476db8ec178a42820828d366  guide/build/tutorial-sources.tar.xz' | sha256sum -c -
+          mkdir -p guide/tutorial
+          tar -xJf guide/build/tutorial-sources.tar.xz -C guide/tutorial
+          python3 guide/tutorial/tools/apply_to_upstream.py upstream
+          python3 -m py_compile guide/tutorial/tools/apply_to_upstream.py
+          grep -q com.tbd.NetHack5.tutorial.TutorialActivity upstream/sys/android/app/AndroidManifest.xml
+          grep -q "versionCode = 50030" upstream/sys/android/app/build.gradle
+          if grep -R -q -E 'chatgpt.com|api.openai.com|github.com' upstream/sys/android/app/src; then
+            echo 'Notice: unexpected online integration URL in tutorial application sources'
+            exit 1
+          fi
+
+      - name: Install native build packages
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y gcc-multilib bison flex make
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: upstream/sys/android/gradle/wrapper/gradle-wrapper.properties
+
+      - name: Set up Android SDK and NDK
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 9123335
+          packages: 'platforms;android-36 ndk;30.0.14904198 build-tools;36.0.0'
+
+      - name: Compile NetHack 5 ARM64 native game engine
+        working-directory: upstream
+        run: |
+          sed -i -e "s,NDK = .*,NDK = $ANDROID_HOME/ndk/30.0.14904198,g" sys/android/Makefile.src sys/android/Makefile.top
+          sed -i -e 's,ABI = .*,ABI = arm64-v8a,g' sys/android/Makefile.src sys/android/Makefile.top
+          (cd sys/android && sh ./setup.sh)
+          make fetch-lua
+          make install
+
+      - name: Build offline Tutorial Mode Android APK
+        working-directory: upstream/sys/android
+        run: bash ./gradlew :app:assembleDebug --stacktrace --no-daemon
+
+      - name: Verify ARM64 APK ZIP and signing
+        shell: bash
+        working-directory: upstream/sys/android
+        run: |
+          set -euo pipefail
+          apk="$(find app/build/outputs/apk/debug -name '*arm64*v8a*.apk' -print -quit)"
+          test -n "$apk"
+          unzip -t "$apk" >/dev/null
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$apk"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" | grep -E '^package:|^native-code:'
+          test -n "$(unzip -Z1 "$apk" | grep 'lib/arm64-v8a/.*\.so$')"
+          cp "$apk" "$RUNNER_TEMP/NetHack5-TutorialMode-arm64-debug.apk"
+          sha256sum "$RUNNER_TEMP/NetHack5-TutorialMode-arm64-debug.apk"
+
+      - name: Upload directly installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: NetHack5-TutorialMode-arm64-debug
+          path: ${{ runner.temp }}/NetHack5-TutorialMode-arm64-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish direct APK download in a separate tutorial preview release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! gh release view tutorial-preview >/dev/null 2>&1; then
+            gh release create tutorial-preview --target "$GITHUB_SHA" --prerelease \
+              --title 'NetHack 5 — Offline Tutorial Mode (test APK)' \
+              --notes 'Offline, preview-inspired Tutorial Mode. ARM64 Android test build. DEBUG-SIGNED with a temporary GitHub Actions key. It will not upgrade an older differently signed NetHack APK in place; back up saves first. Physical-device testing required.'
+          fi
+          gh release upload tutorial-preview "$RUNNER_TEMP/NetHack5-TutorialMode-arm64-debug.apk" --clobber
