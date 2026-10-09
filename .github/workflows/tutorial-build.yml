@@ -37,7 +37,7 @@ jobs:
         run: |
           set -euo pipefail
           test -s guide/build/tutorial-sources.tar.xz
-          echo 'b7d4d1dd40b3cbb06532a3f972da271dcb8ca77c3533ced07bcc1f51bb771308  guide/build/tutorial-sources.tar.xz' | sha256sum -c -
+          echo '199baacd1e0146fd65c27960a674b371dd425f9ec49f3791f101b635c892ef0f  guide/build/tutorial-sources.tar.xz' | sha256sum -c -
           mkdir -p guide/tutorial
           tar -xJf guide/build/tutorial-sources.tar.xz -C guide/tutorial
           python3 guide/tutorial/tools/apply_to_upstream.py upstream
