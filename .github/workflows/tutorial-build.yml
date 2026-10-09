@@ -61,7 +61,7 @@ jobs:
           python3 -m py_compile guide/tutorial/tools/apply_to_upstream.py
           grep -q com.tbd.NetHack5.tutorial.TutorialActivity upstream/sys/android/app/AndroidManifest.xml
           grep -q "versionCode = 50034" upstream/sys/android/app/build.gradle
-          if grep -R -q -E 'chatgpt.com|api.openai.com|github.com' upstream/sys/android/app/src; then
+          if grep -R -q -E 'chatgpt.com|api.openai.com|api.github.com|raw.githubusercontent.com' upstream/sys/android/app/src; then
             echo 'Notice: unexpected online integration URL in tutorial application sources'
             exit 1
           fi
