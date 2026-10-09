@@ -92,7 +92,7 @@ jobs:
                        com.tbd.NetHack5.tutorial.HelpResolverTest TutorialEngineTest; do
             java -cp "$RUNNER_TEMP/tutorial-unit-classes" "$clazz"
           done
-          python3 guide/tutorial/tests/test_overlay.py >/dev/null 2>&1 || true
+          python3 -m compileall -q guide/tutorial/tools
       - name: Set up Android SDK and NDK
         uses: android-actions/setup-android@v3
         with:
