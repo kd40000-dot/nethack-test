@@ -20,4 +20,4 @@ jobs:
           name: tutorial-source-exact
           path: build/tutorial-sources.tar.xz
           if-no-files-found: error
-          retention-days: 6
+          retention-days: 7
