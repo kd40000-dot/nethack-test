@@ -1,0 +1,23 @@
+name: Export current tutorial source for offline help refactor
+
+on:
+  push:
+    branches: [tutorial-mode-build]
+    paths: [.github/workflows/export-tutorial-source.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Export existing source archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: tutorial-source-exact
+          path: build/tutorial-sources.tar.xz
+          if-no-files-found: error
+          retention-days: 5
