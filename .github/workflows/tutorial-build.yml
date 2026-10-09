@@ -54,13 +54,13 @@ jobs:
         run: |
           set -euo pipefail
           test -s guide/build/tutorial-sources.tar.xz
-          echo 'f542a53c43f1b2f88606d35df5ef4bb9c42875ae682f595c12c902f46e9d01da  guide/build/tutorial-sources.tar.xz' | sha256sum -c -
+          echo '7f9a2e5e384a30e06f9e9e0944d0c2890323cb8024ae56ab1e18f10597a9c2a5  guide/build/tutorial-sources.tar.xz' | sha256sum -c -
           mkdir -p guide/tutorial
           tar -xJf guide/build/tutorial-sources.tar.xz -C guide/tutorial
           python3 guide/tutorial/tools/apply_to_upstream.py upstream
           python3 -m py_compile guide/tutorial/tools/apply_to_upstream.py
           grep -q com.tbd.NetHack5.tutorial.TutorialActivity upstream/sys/android/app/AndroidManifest.xml
-          grep -q "versionCode = 50035" upstream/sys/android/app/build.gradle
+          grep -q "versionCode = 50036" upstream/sys/android/app/build.gradle
           if grep -R -q -E 'chatgpt.com|api.openai.com|api.github.com|raw.githubusercontent.com' upstream/sys/android/app/src; then
             echo 'Notice: unexpected online integration URL in tutorial application sources'
             exit 1
@@ -96,12 +96,20 @@ jobs:
           javac -encoding UTF-8 -d "$RUNNER_TEMP/tutorial-unit-classes" \
             "$src/WikiLibrary.java" "$src/GroundMessage.java" "$src/TutorialEngine.java" \
             upstream/sys/android/app/src/com/tbd/NetHack5/tutorial/WeaponStats.java \
-            guide/tutorial/tests/{WikiLibraryTest,GroundMessageTest,HelpResolverTest,TutorialEngineTest}.java
+            guide/tutorial/tests/{WikiLibraryTest,GroundMessageTest,HelpResolverTest,TutorialEngineTest,ContextPriorityTest}.java
           for clazz in WikiLibraryTest com.tbd.NetHack5.tutorial.GroundMessageTest \
-                       com.tbd.NetHack5.tutorial.HelpResolverTest TutorialEngineTest; do
+                       com.tbd.NetHack5.tutorial.HelpResolverTest TutorialEngineTest \
+                       com.tbd.NetHack5.tutorial.ContextPriorityTest; do
             java -cp "$RUNNER_TEMP/tutorial-unit-classes" "$clazz"
           done
           python3 -m compileall -q guide/tutorial/tools
+          python3 - <<'PY'
+          import runpy
+          t=runpy.run_path('guide/tutorial/tests/test_context_priority.py')
+          for name,func in t.items():
+              if name.startswith('test_') and callable(func): func()
+          print('PASS: contextual prioritization and secondary feature UI')
+          PY
       - name: Set up Android SDK and NDK
         uses: android-actions/setup-android@v3
         with:
