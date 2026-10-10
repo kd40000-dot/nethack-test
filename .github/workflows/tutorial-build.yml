@@ -54,13 +54,13 @@ jobs:
         run: |
           set -euo pipefail
           test -s guide/build/tutorial-sources.tar.xz
-          echo '7f9a2e5e384a30e06f9e9e0944d0c2890323cb8024ae56ab1e18f10597a9c2a5  guide/build/tutorial-sources.tar.xz' | sha256sum -c -
+          echo '77d95a2fd977c87af26f4076b7843068cdd12e552d47c4034167fc623838b363  guide/build/tutorial-sources.tar.xz' | sha256sum -c -
           mkdir -p guide/tutorial
           tar -xJf guide/build/tutorial-sources.tar.xz -C guide/tutorial
           python3 guide/tutorial/tools/apply_to_upstream.py upstream
           python3 -m py_compile guide/tutorial/tools/apply_to_upstream.py
           grep -q com.tbd.NetHack5.tutorial.TutorialActivity upstream/sys/android/app/AndroidManifest.xml
-          grep -q "versionCode = 50036" upstream/sys/android/app/build.gradle
+          grep -q "versionCode = 50037" upstream/sys/android/app/build.gradle
           if grep -R -q -E 'chatgpt.com|api.openai.com|api.github.com|raw.githubusercontent.com' upstream/sys/android/app/src; then
             echo 'Notice: unexpected online integration URL in tutorial application sources'
             exit 1
@@ -109,6 +109,14 @@ jobs:
           for name,func in t.items():
               if name.startswith('test_') and callable(func): func()
           print('PASS: contextual prioritization and secondary feature UI')
+          PY
+          python3 - <<'PY'
+          import runpy
+          for filename in ('test_theme_and_tiles.py','test_overlay.py'):
+              test=runpy.run_path('guide/tutorial/tests/'+filename)
+              for name,fn in test.items():
+                  if name.startswith('test_') and callable(fn): fn()
+          print('PASS: native dialogs, menu themes, tilesets and patch overlay')
           PY
       - name: Set up Android SDK and NDK
         uses: android-actions/setup-android@v3
