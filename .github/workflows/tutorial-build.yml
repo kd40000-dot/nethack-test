@@ -58,9 +58,12 @@ jobs:
           mkdir -p guide/tutorial
           tar -xJf guide/build/tutorial-sources.tar.xz -C guide/tutorial
           python3 guide/tutorial/tools/apply_to_upstream.py upstream
+          python3 guide/patches/fix_runtime_tilesets.py upstream
+          python3 -m py_compile guide/patches/fix_runtime_tilesets.py
+          grep -Fq 'com.tbd.nethack5.guide' upstream/sys/android/app/res/values/config.xml
           python3 -m py_compile guide/tutorial/tools/apply_to_upstream.py
           grep -q com.tbd.NetHack5.tutorial.TutorialActivity upstream/sys/android/app/AndroidManifest.xml
-          grep -q "versionCode = 50037" upstream/sys/android/app/build.gradle
+          grep -q "versionCode = 50038" upstream/sys/android/app/build.gradle
           if grep -R -q -E 'chatgpt.com|api.openai.com|api.github.com|raw.githubusercontent.com' upstream/sys/android/app/src; then
             echo 'Notice: unexpected online integration URL in tutorial application sources'
             exit 1
