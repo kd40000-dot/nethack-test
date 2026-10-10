@@ -1,4 +1,4 @@
-name: Export current tutorial source for offline help refactor
+name: Export current tutorial source for themed dialog and tileset refactor
 
 on:
   push:
