@@ -161,6 +161,14 @@ jobs:
           apk="$(find app/build/outputs/apk/debug -name '*arm64*v8a*.apk' -print -quit)"
           test -n "$apk"
           unzip -t "$apk" >/dev/null
+          unzip -Z1 "$apk" > "$RUNNER_TEMP/apk-entry-names.txt"
+          for tilesheet in default_16x16 geoduck_15x25 nevanda_32x32 overlays; do
+            grep -Fxq "res/drawable-nodpi-v4/${tilesheet}.png" "$RUNNER_TEMP/apk-entry-names.txt"
+          done
+          "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump resources "$apk" > "$RUNNER_TEMP/apk-compiled-resources.txt"
+          grep -Fq 'nevanda_32x32' "$RUNNER_TEMP/apk-compiled-resources.txt"
+          grep -Fq 'geoduck_15x25' "$RUNNER_TEMP/apk-compiled-resources.txt"
+          grep -Fq 'default_16x16' "$RUNNER_TEMP/apk-compiled-resources.txt"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$apk" > "$RUNNER_TEMP/tutorial-apk-certificate.txt"
           cat "$RUNNER_TEMP/tutorial-apk-certificate.txt"
           actual="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/tutorial-apk-certificate.txt" | tr -d '\r')"
