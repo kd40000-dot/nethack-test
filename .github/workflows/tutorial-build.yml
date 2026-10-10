@@ -54,14 +54,14 @@ jobs:
         run: |
           set -euo pipefail
           test -s guide/build/tutorial-sources.tar.xz
-          echo '797df7b97e264ad67fed35ed3cd378ae4387fb33a7cd4cfcba430987a7cf5a0c  guide/build/tutorial-sources.tar.xz' | sha256sum -c -
+          echo 'c6ee52fd0e0f7882d006c4f12a352b637ec38497c294fa5c7402acff3c625b82  guide/build/tutorial-sources.tar.xz' | sha256sum -c -
           mkdir -p guide/tutorial
           tar -xJf guide/build/tutorial-sources.tar.xz -C guide/tutorial
           python3 guide/tutorial/tools/apply_to_upstream.py upstream
           grep -Fq 'com.tbd.nethack5.guide' upstream/sys/android/app/res/values/config.xml
           python3 -m py_compile guide/tutorial/tools/apply_to_upstream.py
           grep -q com.tbd.NetHack5.tutorial.TutorialActivity upstream/sys/android/app/AndroidManifest.xml
-          grep -q "versionCode = 50039" upstream/sys/android/app/build.gradle
+          grep -q "versionCode = 50040" upstream/sys/android/app/build.gradle
           if grep -R -q -E 'chatgpt.com|api.openai.com|api.github.com|raw.githubusercontent.com' upstream/sys/android/app/src; then
             echo 'Notice: unexpected online integration URL in tutorial application sources'
             exit 1
@@ -124,7 +124,7 @@ jobs:
           tests=runpy.run_path('guide/tutorial/tests/test_player_and_prompt.py')
           for name,func in tests.items():
               if name.startswith('test_') and callable(func): func()
-          print('PASS: player marker and visible-only prompt detection')
+          print('PASS: no player marker, native ring removal repaint, and prompt detection')
           PY
       - name: Set up Android SDK and NDK
         uses: android-actions/setup-android@v3
