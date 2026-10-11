@@ -54,7 +54,7 @@ jobs:
         run: |
           set -euo pipefail
           test -s guide/build/tutorial-sources.tar.xz
-          echo '0dc3cdbb3af6710bb414287fb2cd67c524aee309e9c936e21fa98180d12b55f6  guide/build/tutorial-sources.tar.xz' | sha256sum -c -
+          echo '2384cdc77478b60bd55bbd6c3db9583185d92c42be105e568637670dcc85ea28  guide/build/tutorial-sources.tar.xz' | sha256sum -c -
           mkdir -p guide/tutorial
           tar -xJf guide/build/tutorial-sources.tar.xz -C guide/tutorial
           python3 guide/tutorial/tools/apply_to_upstream.py upstream
@@ -155,7 +155,7 @@ jobs:
                   if name.startswith('test_') and callable(func):
                       func()
                       count+=1
-          assert count>=39, "Missing audit coverage"
+          assert count>=40, "Missing audit coverage"
           print('PASS: full tutorial UX audit ('+str(count)+' Python checks)')
           PY
       - name: Set up Android SDK and NDK
