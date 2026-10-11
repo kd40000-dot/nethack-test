@@ -5,6 +5,7 @@ on:
     branches: [tutorial-mode-build]
     paths:
       - 'build/tutorial-sources.tar.xz'
+      - 'patches/**'
       - '.github/workflows/tutorial-build.yml'
   workflow_dispatch:
 
@@ -58,10 +59,11 @@ jobs:
           mkdir -p guide/tutorial
           tar -xJf guide/build/tutorial-sources.tar.xz -C guide/tutorial
           python3 guide/tutorial/tools/apply_to_upstream.py upstream
+          python3 guide/patches/limit_nearby_context.py upstream guide/tutorial
           grep -Fq 'com.tbd.nethack5.guide' upstream/sys/android/app/res/values/config.xml
           python3 -m py_compile guide/tutorial/tools/apply_to_upstream.py
           grep -q com.tbd.NetHack5.tutorial.TutorialActivity upstream/sys/android/app/AndroidManifest.xml
-          grep -q "versionCode = 50043" upstream/sys/android/app/build.gradle
+          grep -q "versionCode = 50044" upstream/sys/android/app/build.gradle
           if grep -R -q -E 'chatgpt.com|api.openai.com|api.github.com|raw.githubusercontent.com' upstream/sys/android/app/src; then
             echo 'Notice: unexpected online integration URL in tutorial application sources'
             exit 1
@@ -97,12 +99,14 @@ jobs:
           javac -encoding UTF-8 -d "$RUNNER_TEMP/tutorial-unit-classes" \
             "$src/WikiLibrary.java" "$src/GroundMessage.java" "$src/TutorialEngine.java" "$src/FloorActionGuard.java" \
             upstream/sys/android/app/src/com/tbd/NetHack5/tutorial/WeaponStats.java \
-            guide/tutorial/tests/{WikiLibraryTest,GroundMessageTest,HelpResolverTest,TutorialEngineTest,ContextPriorityTest,FloorActionGuardTest,ContextualDoorTest}.java
+            guide/tutorial/tests/{WikiLibraryTest,GroundMessageTest,HelpResolverTest,TutorialEngineTest,ContextPriorityTest,FloorActionGuardTest,ContextualDoorTest}.java \
+            guide/patches/tests/NearbyContextTest.java
           for clazz in WikiLibraryTest com.tbd.NetHack5.tutorial.GroundMessageTest \
                        com.tbd.NetHack5.tutorial.HelpResolverTest TutorialEngineTest \
                        com.tbd.NetHack5.tutorial.ContextPriorityTest \
                        com.tbd.NetHack5.tutorial.FloorActionGuardTest \
-                       com.tbd.NetHack5.tutorial.ContextualDoorTest; do
+                       com.tbd.NetHack5.tutorial.ContextualDoorTest \
+                       com.tbd.NetHack5.tutorial.NearbyContextTest; do
             java -cp "$RUNNER_TEMP/tutorial-unit-classes" "$clazz"
           done
           python3 -m compileall -q guide/tutorial/tools
@@ -158,6 +162,7 @@ jobs:
           assert count>=40, "Missing audit coverage"
           print('PASS: full tutorial UX audit ('+str(count)+' Python checks)')
           PY
+          python3 guide/patches/tests/test_nearby_context.py upstream
       - name: Set up Android SDK and NDK
         uses: android-actions/setup-android@v3
         with:
