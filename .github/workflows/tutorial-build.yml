@@ -54,14 +54,14 @@ jobs:
         run: |
           set -euo pipefail
           test -s guide/build/tutorial-sources.tar.xz
-          echo '23d6abfcd4c44a43ed408b623c04145c651a58038b2c9b1cc9da39fe826a00a9  guide/build/tutorial-sources.tar.xz' | sha256sum -c -
+          echo '0dc3cdbb3af6710bb414287fb2cd67c524aee309e9c936e21fa98180d12b55f6  guide/build/tutorial-sources.tar.xz' | sha256sum -c -
           mkdir -p guide/tutorial
           tar -xJf guide/build/tutorial-sources.tar.xz -C guide/tutorial
           python3 guide/tutorial/tools/apply_to_upstream.py upstream
           grep -Fq 'com.tbd.nethack5.guide' upstream/sys/android/app/res/values/config.xml
           python3 -m py_compile guide/tutorial/tools/apply_to_upstream.py
           grep -q com.tbd.NetHack5.tutorial.TutorialActivity upstream/sys/android/app/AndroidManifest.xml
-          grep -q "versionCode = 50042" upstream/sys/android/app/build.gradle
+          grep -q "versionCode = 50043" upstream/sys/android/app/build.gradle
           if grep -R -q -E 'chatgpt.com|api.openai.com|api.github.com|raw.githubusercontent.com' upstream/sys/android/app/src; then
             echo 'Notice: unexpected online integration URL in tutorial application sources'
             exit 1
@@ -97,11 +97,12 @@ jobs:
           javac -encoding UTF-8 -d "$RUNNER_TEMP/tutorial-unit-classes" \
             "$src/WikiLibrary.java" "$src/GroundMessage.java" "$src/TutorialEngine.java" "$src/FloorActionGuard.java" \
             upstream/sys/android/app/src/com/tbd/NetHack5/tutorial/WeaponStats.java \
-            guide/tutorial/tests/{WikiLibraryTest,GroundMessageTest,HelpResolverTest,TutorialEngineTest,ContextPriorityTest,FloorActionGuardTest}.java
+            guide/tutorial/tests/{WikiLibraryTest,GroundMessageTest,HelpResolverTest,TutorialEngineTest,ContextPriorityTest,FloorActionGuardTest,ContextualDoorTest}.java
           for clazz in WikiLibraryTest com.tbd.NetHack5.tutorial.GroundMessageTest \
                        com.tbd.NetHack5.tutorial.HelpResolverTest TutorialEngineTest \
                        com.tbd.NetHack5.tutorial.ContextPriorityTest \
-                       com.tbd.NetHack5.tutorial.FloorActionGuardTest; do
+                       com.tbd.NetHack5.tutorial.FloorActionGuardTest \
+                       com.tbd.NetHack5.tutorial.ContextualDoorTest; do
             java -cp "$RUNNER_TEMP/tutorial-unit-classes" "$clazz"
           done
           python3 -m compileall -q guide/tutorial/tools
@@ -144,6 +145,18 @@ jobs:
           for name,fun in tests.items():
               if name.startswith('test_') and callable(fun): fun()
           print('PASS: stale pickup prevention and multi-item pile recheck')
+          PY
+          python3 - <<'PY'
+          import glob,runpy
+          count=0
+          for filename in glob.glob('guide/tutorial/tests/test_*.py'):
+              tests=runpy.run_path(filename)
+              for name,func in tests.items():
+                  if name.startswith('test_') and callable(func):
+                      func()
+                      count+=1
+          assert count>=39, "Missing audit coverage"
+          print('PASS: full tutorial UX audit ('+str(count)+' Python checks)')
           PY
       - name: Set up Android SDK and NDK
         uses: android-actions/setup-android@v3
