@@ -3,7 +3,9 @@ name: Export current tutorial source for themed dialog and tileset refactor
 on:
   push:
     branches: [tutorial-mode-build]
-    paths: [.github/workflows/export-tutorial-source.yml]
+    paths:
+      - .github/workflows/export-tutorial-source.yml
+      - build/tutorial-sources.tar.xz
   workflow_dispatch:
 
 permissions:
